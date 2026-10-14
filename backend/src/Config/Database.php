@@ -1,5 +1,8 @@
 <?php
 
+namespace Src\Config;
+use PDO;
+
 class Database {
     protected ?PDO $db_connection = null;
 

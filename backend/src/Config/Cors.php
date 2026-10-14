@@ -1,10 +1,10 @@
 <?php
 
-namespace Src\Core;
+namespace Src\Config;
 
 class Cors
 {
-    public static function handle(): void
+    public function handle(): void
     {
         $allowedOrigins = [
             'http://localhost:3000',
