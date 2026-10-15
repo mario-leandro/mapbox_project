@@ -2,6 +2,7 @@
 
 namespace Src\Config;
 use PDO;
+use PDOException;
 
 class Database {
     protected ?PDO $db_connection = null;
@@ -10,7 +11,7 @@ class Database {
         $this->db_connection = $this->getDbConnection();
     }
 
-    public function getDbConnection(): PDO
+    public function getDbConnection()
     {
         $this->db_connection = null;
         

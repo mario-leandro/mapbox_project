@@ -4,7 +4,7 @@ namespace Src\Config;
 
 class Cors
 {
-    public function handle(): void
+    public static function handle(): void
     {
         $allowedOrigins = [
             'http://localhost:3000',

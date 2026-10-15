@@ -36,7 +36,7 @@ class UserService {
 
         $existingUser = $this->userRepository->findByEmail($email);
 
-        if (empty($existingUser)) {
+        if (!empty($existingUser)) {
             throw new InvalidArgumentException(
                 "Já existe um usuário com este e-mail."
             );

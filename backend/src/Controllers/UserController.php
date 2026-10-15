@@ -5,15 +5,12 @@ namespace Src\Controllers;
 use InvalidArgumentException;
 use Src\Config\Cors;
 use Src\Helpers\Helper;
-use Src\Models\User;
-use Src\Repositories\UserRepository;
 use Throwable;
 use Src\Services\UserService;
 
 class UserController {
     public function __construct(
-        private UserRepository $userRepository,
-        private UserService $UserService,
+        private UserService $userService,
         private Cors $cors,
         private Helper $helper
     ) {}
@@ -39,7 +36,7 @@ class UserController {
                 }
             }
 
-            $id = $this->UserService->create(
+            $this->userService->create(
                 $data['name'],
                 $data['email'],
                 $data['password']
@@ -48,7 +45,7 @@ class UserController {
             $this->helper->Response(true, ['message' => 'Usuário criado com sucesso'], 201);
         } catch (Throwable $e) {
             http_response_code(500);
-            echo json_encode(['error' => $e->getMessage()]);
+            $this->helper->Response(false, ['message' => $e->getMessage()], 500);
         }
     }
 }
