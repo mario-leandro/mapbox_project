@@ -1,4 +1,9 @@
 {
+    "autoload": {
+        "psr-4": {
+            "Src\\": "src/"
+        }
+    },
     "require": {
         "firebase/php-jwt": "^7.2",
         "vlucas/phpdotenv": "^5.7"
