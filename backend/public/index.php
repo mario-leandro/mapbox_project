@@ -10,7 +10,7 @@ use Src\Repositories\AuthRepository;
 use Src\Middleware\AuthMiddleware;
 use Src\Helpers\Helper;
 
-$db_connection = new Database();
+$db_connection = (new Database())->getDbConnection();
 $userRepository = new AuthRepository($db_connection);
 $authService = new AuthService($userRepository);
 $helper = new Helper();

@@ -13,6 +13,8 @@ class Database {
 
     public function getDbConnection()
     {
+        $this->db_connection = null;
+        
         try {
             $this->db_connection = new PDO('mysql:host=' . $_ENV['DB_HOST'] . ';dbname=' . $_ENV['DB_NAME'], $_ENV['DB_USER'], $_ENV['DB_PASS']);
 
