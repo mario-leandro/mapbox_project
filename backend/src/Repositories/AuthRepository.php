@@ -2,9 +2,9 @@
 
 namespace Src\Repositories;
 
-use Src\Config\Database;
+use Src\Core\Database;
 
-class UserRepository {
+class AuthRepository {
     public function __construct(
         private Database $db_connection
     ) {}

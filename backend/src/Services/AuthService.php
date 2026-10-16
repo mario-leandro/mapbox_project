@@ -4,11 +4,11 @@ namespace Src\Services;
 
 use InvalidArgumentException;
 use Src\Models\User;
-use Src\Repositories\UserRepository;
+use Src\Repositories\AuthRepository;
 
-class UserService {
+class AuthService {
     public function __construct(
-        private UserRepository $userRepository
+        private AuthRepository $userRepository
     ) {}
 
     public function create(string $name, string $email, string $password): int {
@@ -49,5 +49,13 @@ class UserService {
         $user->setEmail($email);
 
         return $this->userRepository->save($user);
+    }
+
+    public function findByEmail(string $email): ?array {
+        return $this->userRepository->findByEmail($email);
+    }
+
+    public function save(string $name, string $email, string $password): int {
+        return $this->create($name, $email, $password);
     }
 }

@@ -12,7 +12,7 @@ class AuthMiddleware
         private Helper $helper
     ) {}
 
-    public function Authenticate(): void
+    public function Authenticate()
     {
         $headers = getallheaders();
         $authHeader = $headers['Authorization'] ?? '';
@@ -32,6 +32,8 @@ class AuthMiddleware
             if (!$decoded) {
                 $this->helper->Response(false, ['message' => 'Unauthorized'], 401);
             }
+
+            return (array) $decoded;
         } catch (\Exception $e) {
             $this->helper->Response(false, ['message' => 'Unauthorized'], 401);
         }
