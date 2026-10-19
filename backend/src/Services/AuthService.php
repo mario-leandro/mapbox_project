@@ -48,7 +48,13 @@ class AuthService {
         $user->setName($name);
         $user->setEmail($email);
 
-        return $this->userRepository->save($user);
+        $userData = [
+            'name' => $user->getName(),
+            'email' => $user->getEmail(),
+            'password' => $passwordHash
+        ];
+
+        return $this->userRepository->save($userData);
     }
 
     public function findByEmail(string $email): ?array {

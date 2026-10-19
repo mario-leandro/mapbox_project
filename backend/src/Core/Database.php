@@ -5,25 +5,24 @@ use PDO;
 use PDOException;
 
 class Database {
-    protected ?PDO $db_connection = null;
+    protected ?PDO $db_connection;
+
+    public function __construct()
+    {
+        $this->db_connection = new PDO(
+            "mysql:host={$_ENV['DB_HOST']};dbname={$_ENV['DB_NAME']};charset=utf8mb4",
+            $_ENV['DB_USER'],
+            $_ENV['DB_PASS'],
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ]
+        );
+    }
 
     public function getDbConnection()
-    {
-        $this->db_connection = null;
-        
-        try {
-            $this->db_connection = new PDO(
-                'mysql:host=' . $_ENV['DB_HOST'] . ';dbname=' . $_ENV['DB_NAME'], $_ENV['DB_USER'], $_ENV['DB_PASS'],
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-                ]
-            );
-
-            return $this->db_connection;
-        } catch (PDOException $e) {
-            echo 'Connection failed: ' . $e->getMessage();
-        }
+    {   
+        return $this->db_connection;
     }
 
     public function closeDbConnection() {
@@ -47,6 +46,9 @@ class Database {
         if (!empty($limit)) {
             $query .= " LIMIT " . $limit;
         }
+
+        // var_dump($query);
+        // var_dump($condicoes);
 
         $stmt = $this->db_connection->prepare($query);
         $stmt->execute($condicoes);

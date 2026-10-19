@@ -6,6 +6,14 @@ class Router
 {
     private array $routes = [];
 
+     private function add(
+        string $method,
+        string $path,
+        callable $handler
+    ): void {
+        $this->routes[$method][$path] = $handler;
+    }
+
     public function get(string $path, callable $handler): void
     {
         $this->add('GET', $path, $handler);
@@ -24,14 +32,6 @@ class Router
     public function delete(string $path, callable $handler): void
     {
         $this->add('DELETE', $path, $handler);
-    }
-
-    private function add(
-        string $method,
-        string $path,
-        callable $handler
-    ): void {
-        $this->routes[$method][$path] = $handler;
     }
 
     public function dispatch(string $method, string $uri): void
