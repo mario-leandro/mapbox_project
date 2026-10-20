@@ -8,10 +8,10 @@ use Src\Repositories\AuthRepository;
 
 class AuthService {
     public function __construct(
-        private AuthRepository $userRepository
+        private AuthRepository $AuthRepository
     ) {}
 
-    public function create(string $name, string $email, string $password): int {
+    public function create(string $name, string $email, string $password): bool {
         if (empty($name) || empty($email) || empty($password)) {
             throw new InvalidArgumentException("Todos os campos são obrigatórios.");
         }
@@ -34,7 +34,7 @@ class AuthService {
             );
         }
 
-        $existingUser = $this->userRepository->findByEmail($email);
+        $existingUser = $this->AuthRepository->findByEmail($email);
 
         if (!empty($existingUser)) {
             throw new InvalidArgumentException(
@@ -49,19 +49,15 @@ class AuthService {
         $user->setEmail($email);
 
         $userData = [
-            'name' => $user->getName(),
-            'email' => $user->getEmail(),
+            'name' => $name,
+            'email' => $email,
             'password' => $passwordHash
         ];
 
-        return $this->userRepository->save($userData);
+        return $this->AuthRepository->create($userData);
     }
 
     public function findByEmail(string $email): ?array {
-        return $this->userRepository->findByEmail($email);
-    }
-
-    public function save(string $name, string $email, string $password): int {
-        return $this->create($name, $email, $password);
+        return $this->AuthRepository->findByEmail($email);
     }
 }

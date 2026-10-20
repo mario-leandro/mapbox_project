@@ -9,7 +9,7 @@ class AuthRepository {
         private Database $db_connection
     ) {}
 
-    public function save(array $data): bool
+    public function create(array $data): bool
     {
         return $this->db_connection->insert('users', $data);
     }

@@ -31,22 +31,13 @@ class AuthController
             $this->helper->Response(
                 false, ['message' => 'Campos obrigatórios'], 422
             );
+            return;
         }
 
-        $existing = $this->authService->findByEmail($data['email']);
-
-        if ($existing) {
-            $this->helper->Response(
-                false, ['message' => 'E-mail já cadastrado'], 409
-            );
-        }
-
-        $passwordHash = password_hash($data['password'], PASSWORD_DEFAULT);
-
-        $this->authService->save(
+        $this->authService->create(
             $data['name'],
             $data['email'],
-            $passwordHash
+            $data['password']
         );
 
         $this->helper->Response(
@@ -62,7 +53,7 @@ class AuthController
 
         if (!$user || !password_verify($data['password'] ?? '', $user['password'])) {
             $this->helper->Response(
-                false, ['message' => 'Credenciais inválidas'], 401
+                false, ['message' => 'Email ou senha inválidos'], 401
             );
         }
 
@@ -72,20 +63,12 @@ class AuthController
             'exp' => time() + 60 * 60 * 24 * 30
         ];
 
-        $token = JWT::encode($payload, $_ENV['JWT_SECRET'], 'HS256');
+        JWT::encode($payload, $_ENV['JWT_SECRET'], 'HS256');
 
         $this->helper->Response(
             true, [
                 'message' => 'Login efetuado com sucesso',
-                'data' => [
-                    'token' => $token,
-                    'user' => [
-                        'id' => $user['id'],
-                        'name' => $user['name'],
-                        'email' => $user['email']
-                    ]
-                ]
-            ]
+            ], 200
         );
     }
 
