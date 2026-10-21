@@ -9,12 +9,13 @@ class Helper
         return json_decode(file_get_contents('php://input'), true) ?? [];
     }
 
-    public function Response(bool $success, array $data, int $statusCode = 200): void
+    public function Response(bool $success, string $message, ?array $data = null, int $statusCode = 200): void
     {
         http_response_code($statusCode);
         echo json_encode([
             "success" => $success,
-            "data" => $data,
+            "message" => $message,
+            "data" => $data ?? null
         ]);
         exit;
     }

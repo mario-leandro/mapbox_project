@@ -29,7 +29,7 @@ class AuthController
             empty($data['password'])
         ) {
             $this->helper->Response(
-                false, ['message' => 'Campos obrigatórios'], 422
+                false, 'Campos obrigatórios', null, 422
             );
             return;
         }
@@ -41,7 +41,7 @@ class AuthController
         );
 
         $this->helper->Response(
-            true, ['message' => 'Usuário criado com sucesso'], 201
+            true, 'Usuário criado com sucesso', null, 201
         );
     }
 
@@ -53,22 +53,30 @@ class AuthController
 
         if (!$user || !password_verify($data['password'] ?? '', $user['password'])) {
             $this->helper->Response(
-                false, ['message' => 'Email ou senha inválidos'], 401
+                false, 'Email ou senha inválidos', null, 401
             );
+
+            return;
         }
 
         $payload = [
             'sub' => $user['id'],
             'email' => $user['email'],
-            'exp' => time() + 60 * 60 * 24 * 30
+            'exp' => time() + 60 * 15 // 15 minutos 
         ];
 
-        JWT::encode($payload, $_ENV['JWT_SECRET'], 'HS256');
+        $token = JWT::encode($payload, $_ENV['CHAVE_JWT'], 'HS256');
+
+        setcookie('access_token', $token, [
+            'expires' => time() + (60 * 15),
+            'path' => '/',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
 
         $this->helper->Response(
-            true, [
-                'message' => 'Login efetuado com sucesso',
-            ], 200
+            true, 'Login efetuado com sucesso', null, 200
         );
     }
 
@@ -77,13 +85,10 @@ class AuthController
         $payload = $this->authMiddleware->Authenticate();
 
         $this->helper->Response(
-            true, 
-            [
-                'data' => [
-                    'id' => $payload['sub'], 
-                    'email' => $payload['email'], 
-                    'exp' => $payload['exp']
-                ]
+            true, 'Dados do usuário', [
+                'id' => $payload['sub'], 
+                'email' => $payload['email'], 
+                'exp' => $payload['exp']
             ], 200
         );
     }
