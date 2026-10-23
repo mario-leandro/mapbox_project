@@ -3,12 +3,15 @@
 require_once __DIR__ . '/../bootstrap/app.php';
 
 use Src\Core\Router;
+use Src\Core\Cors;
 use Src\Controllers\AuthController;
 use Src\Services\AuthService;
 use Src\Core\Database;
 use Src\Repositories\AuthRepository;
 use Src\Middleware\AuthMiddleware;
 use Src\Helpers\Helper;
+
+Cors::handle();
 
 $db_connection = new Database();
 $userRepository = new AuthRepository($db_connection);
