@@ -1,6 +1,6 @@
 import { store } from './core/Store.js';
 import { initTheme } from './core/theme.js';
-import { Router } from './router/Router.js';
+import { createRouter } from './router/Router.js';
 import { AuthLayout } from './layouts/AuthLayout.js';
 import { MainLayout } from './layouts/MainLayout.js';
 
@@ -37,7 +37,7 @@ async function bootstrap() {
   initTheme();
   await restoreSession();
 
-  const router = new Router({
+  const router = createRouter({
     routes,
     notFound,
     outlet: document.getElementById('app'),

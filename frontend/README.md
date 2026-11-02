@@ -30,19 +30,54 @@ Front e API em domínios diferentes exigem no PHP:
 
 ## Arquitetura
 
+Sem classes: componentes, roteador e store são **funções fábrica**; o estado privado
+vive em variáveis dentro da função (closures).
+
 ```
 Pages / Components  ->  Services  ->  ApiService  ->  fetch  ->  API PHP
 ```
 
-- `core/Component.js`: ciclo de vida `render()` / `onMount()` / `destroy()`.
-  Listeners só via `this.on()` ou `this.delegate()`; o `destroy()` remove todos.
+- `core/Component.js`: `createComponent(setup)` e `createLayout(setup)`.
+  Ciclo de vida `render()` / `onMount()` / `onDestroy()`.
+  Listeners só via `ctx.on()` ou `ctx.delegate()`; o `destroy()` remove todos.
 - `core/dom.js`: tag `html` que escapa toda interpolação (proteção contra XSS).
-- `router/Router.js`: History API, guards (`public`, `private`, `guest`),
+- `core/Store.js`: `createStore()`; a instância `store` guarda só sessão e tema.
+- `router/Router.js`: `createRouter()`, History API, guards (`public`, `private`, `guest`),
   parâmetros (`/historico/:id`), 404, import dinâmico de páginas.
 - `layouts/`: `AuthLayout` e `MainLayout`; o layout é preservado entre páginas que o compartilham.
 
+### Anatomia de um componente
+
+```js
+import { createComponent } from '../core/Component.js';
+import { html } from '../core/dom.js';
+
+export function Counter({ start = 0 }) {
+  return createComponent((ctx) => {
+    let count = start; // estado privado
+
+    return {
+      render() {
+        return html`<button type="button">${count}</button>`;
+      },
+      onMount() {
+        ctx.on(ctx.$('button'), 'click', () => {
+          count += 1;
+          ctx.$('button').textContent = count;
+        });
+      },
+      reset() { count = start; }, // qualquer outra chave vira método público
+    };
+  });
+}
+```
+
+Uso: `const c = Counter({ start: 5 }); c.mount(elemento); ... c.destroy();`
+
 ### Criar uma nova página
 
-1. Crie `src/pages/MinhaPagina.js` com `class MinhaPagina extends Page`.
+1. Crie `src/pages/MinhaPagina.js` exportando `function MinhaPagina(props)` que retorna
+   `createComponent(...)` com uma chave `title`. As props do roteador são
+   `{ params, query, router, store }`.
 2. Adicione uma linha em `routes` no `src/app.js`.
 3. (Opcional) adicione o link em `NAV_ITEMS`, em `components/Sidebar.js`.

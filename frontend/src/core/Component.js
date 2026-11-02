@@ -1,86 +1,97 @@
 /**
- * Base class for every component, page and layout.
+ * Component factory (no classes).
  *
- * Lifecycle:
- *   render()  -> returns the markup (use the `html` tag so data is escaped)
- *   mount(el) -> injects the markup into `el`, then calls onMount()
- *   destroy() -> runs cleanups, destroys children, removes ALL listeners
+ * A component is a function that returns createComponent(setup).
+ * `setup` receives a context (`ctx`) and returns the component definition:
  *
- * Register listeners only through `this.on()` / `this.delegate()`:
- * they share one AbortController, so destroy() removes them all at once.
- * A destroyed component cannot be mounted again; create a new instance.
+ *   export function Counter({ start }) {
+ *     return createComponent((ctx) => {
+ *       let count = start;                         // private state = closure variable
+ *       return {
+ *         render() { return html`<button>${count}</button>`; },
+ *         onMount() { ctx.on(ctx.$('button'), 'click', () => { ... }); },
+ *         reset() { count = start; },              // any other key becomes a public method
+ *       };
+ *     });
+ *   }
+ *
+ * Lifecycle: render() -> mount(el) -> onMount() ... destroy() -> onDestroy().
+ * Register listeners only through ctx.on() / ctx.delegate(): they share one
+ * AbortController, so destroy() removes all of them at once.
+ * A destroyed component cannot be mounted again; call the factory again.
  */
-export class Component {
-  #abort = new AbortController();
-  #children = new Set();
-  #cleanups = [];
+export function createComponent(setup) {
+  const abort = new AbortController();
+  const children = new Set();
+  const cleanups = [];
+  let el = null;
 
-  el = null;
+  const ctx = {
+    get el() {
+      return el;
+    },
+    $: (selector) => el?.querySelector(selector) ?? null,
+    $$: (selector) => (el ? [...el.querySelectorAll(selector)] : []),
 
-  constructor(props = {}) {
-    this.props = props;
-  }
+    /** addEventListener tied to this component's lifetime. */
+    on(target, type, handler, options = {}) {
+      target.addEventListener(type, handler, { ...options, signal: abort.signal });
+    },
 
-  /** @returns {string|import('./dom.js').SafeHTML} */
-  render() {
-    return '';
-  }
+    /** Event delegation inside this component. Use 'focusin' instead of 'focus'. */
+    delegate(type, selector, handler) {
+      ctx.on(el, type, (event) => {
+        const target = event.target.closest?.(selector);
+        if (target && el.contains(target)) handler(event, target);
+      });
+    },
 
-  /** Hook: query elements, register listeners, mount children. */
-  onMount() {}
+    /** Register a function to run on destroy (e.g. a store unsubscribe). */
+    addCleanup(fn) {
+      cleanups.push(fn);
+    },
 
-  /** Hook: release resources that are not listeners (maps, timers...). */
-  onDestroy() {}
+    /** Mounts a child into `container` and destroys it together with this component. */
+    addChild(child, container) {
+      child.mount(container);
+      children.add(child);
+      return child;
+    },
+  };
 
-  mount(container) {
-    this.el = container;
-    container.innerHTML = String(this.render());
-    this.onMount();
-    return this;
-  }
+  const { render = () => '', onMount, onDestroy, ...methods } = setup(ctx);
 
-  /** addEventListener tied to this component's lifetime. */
-  on(target, type, handler, options = {}) {
-    target.addEventListener(type, handler, { ...options, signal: this.#abort.signal });
-  }
+  const instance = {
+    ...methods,
+    get el() {
+      return el;
+    },
+    mount(container) {
+      el = container;
+      container.innerHTML = String(render());
+      onMount?.();
+      return instance;
+    },
+    destroy() {
+      if (!el) return;
+      onDestroy?.();
+      children.forEach((child) => child.destroy());
+      children.clear();
+      cleanups.splice(0).forEach((fn) => fn());
+      abort.abort();
+      el.innerHTML = '';
+      el = null;
+    },
+  };
+  return instance;
+}
 
-  /** Event delegation inside this component. Use 'focusin' instead of 'focus'. */
-  delegate(type, selector, handler) {
-    this.on(this.el, type, (event) => {
-      const target = event.target.closest?.(selector);
-      if (target && this.el.contains(target)) handler(event, target);
-    });
-  }
-
-  /** Register a function to run on destroy (e.g. a store unsubscribe). */
-  addCleanup(fn) {
-    this.#cleanups.push(fn);
-  }
-
-  /** Mounts a child component into `container` and destroys it with this one. */
-  addChild(child, container) {
-    child.mount(container);
-    this.#children.add(child);
-    return child;
-  }
-
-  $(selector) {
-    return this.el?.querySelector(selector) ?? null;
-  }
-
-  $$(selector) {
-    return this.el ? [...this.el.querySelectorAll(selector)] : [];
-  }
-
-  destroy() {
-    if (!this.el) return;
-    this.onDestroy();
-    this.#children.forEach((child) => child.destroy());
-    this.#children.clear();
-    this.#cleanups.forEach((fn) => fn());
-    this.#cleanups = [];
-    this.#abort.abort();
-    this.el.innerHTML = '';
-    this.el = null;
-  }
+/**
+ * Same as createComponent, plus getOutlet(): the element where the Router mounts pages.
+ * A layout's markup must contain an element with id="main-content".
+ */
+export function createLayout(setup) {
+  const layout = createComponent(setup);
+  layout.getOutlet = () => layout.el?.querySelector('#main-content') ?? null;
+  return layout;
 }

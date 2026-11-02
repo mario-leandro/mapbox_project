@@ -2,72 +2,27 @@ import { ENV } from '../config/env.js';
 import { safeRedirectPath } from '../utils/helpers.js';
 
 /**
- * History API router.
+ * History API router (factory, state lives in the closure).
  *
  * Route shape:
  *   { path, loader, layout, access }          // access: 'public' | 'private' | 'guest'
  *   { path, redirect }
- * `loader` returns the Page class (dynamic import), `layout` is a Layout class.
+ * `loader` returns the page factory (dynamic import), `layout` is a layout factory.
  * The layout instance is kept while consecutive routes share the same layout.
  */
-export class Router {
-  #routes;
-  #notFound;
-  #outlet;
-  #store;
-  #loginPath;
-  #homePath;
+export function createRouter({ routes: routeDefs, notFound, outlet, store, loginPath = '/login', homePath = '/dashboard' }) {
+  const routes = routeDefs.map((route) => ({ ...route, ...compile(route.path) }));
+  const listeners = new Set();
+  const abort = new AbortController();
 
-  #layout = null;
-  #LayoutClass = null;
-  #page = null;
-  #navId = 0;
-  #firstRender = true;
-  #currentPath = '';
-  #listeners = new Set();
-  #abort = new AbortController();
+  let layout = null;
+  let currentLayoutFactory = null;
+  let page = null;
+  let navId = 0;
+  let firstRender = true;
+  let currentPath = '';
 
-  constructor({ routes, notFound, outlet, store, loginPath = '/login', homePath = '/dashboard' }) {
-    this.#routes = routes.map((route) => ({ ...route, ...compile(route.path) }));
-    this.#notFound = notFound;
-    this.#outlet = outlet;
-    this.#store = store;
-    this.#loginPath = loginPath;
-    this.#homePath = homePath;
-  }
-
-  get currentPath() {
-    return this.#currentPath;
-  }
-
-  start() {
-    history.scrollRestoration = 'manual';
-    const { signal } = this.#abort;
-    document.addEventListener('click', (event) => this.#onLinkClick(event), { signal });
-    window.addEventListener('popstate', () => this.#render(new URL(location.href), 'none'), { signal });
-    return this.#render(new URL(location.href), 'none');
-  }
-
-  navigate(to, { replace = false } = {}) {
-    return this.#go(to, replace ? 'replace' : 'push');
-  }
-
-  /** @returns {() => void} unsubscribe function. Called after each page is mounted. */
-  onNavigate(fn) {
-    this.#listeners.add(fn);
-    return () => this.#listeners.delete(fn);
-  }
-
-  destroy() {
-    this.#abort.abort();
-    this.#page?.destroy();
-    this.#layout?.destroy();
-    this.#listeners.clear();
-  }
-
-  // ---------------------------------------------------------------- internals
-
-  #onLinkClick(event) {
+  function onLinkClick(event) {
     if (event.defaultPrevented || event.button !== 0) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
@@ -78,25 +33,25 @@ export class Router {
     if (url.origin !== location.origin) return;
 
     event.preventDefault();
-    this.navigate(url.pathname + url.search + url.hash);
+    navigate(url.pathname + url.search + url.hash);
   }
 
-  #go(to, mode) {
+  function go(to, mode) {
     const url = new URL(to, location.origin);
     if (url.origin !== location.origin) {
       location.assign(url);
       return Promise.resolve();
     }
-    return this.#render(url, mode);
+    return render(url, mode);
   }
 
-  #match(pathname) {
-    for (const route of this.#routes) {
-      const match = route.regex.exec(pathname);
-      if (!match) continue;
+  function match(pathname) {
+    for (const route of routes) {
+      const found = route.regex.exec(pathname);
+      if (!found) continue;
       try {
         const params = {};
-        route.keys.forEach((key, i) => (params[key] = decodeURIComponent(match[i + 1])));
+        route.keys.forEach((key, i) => (params[key] = decodeURIComponent(found[i + 1])));
         return { route, params };
       } catch {
         return null; // malformed percent-encoding -> 404
@@ -106,24 +61,24 @@ export class Router {
   }
 
   /** @param {'push'|'replace'|'none'} mode 'none' = URL already changed (popstate/first load) */
-  async #render(url, mode) {
-    const id = ++this.#navId;
-    const matched = this.#match(url.pathname);
-    const route = matched?.route ?? this.#notFound;
+  async function render(url, mode) {
+    const id = ++navId;
+    const matched = match(url.pathname);
+    const route = matched?.route ?? notFound;
     const params = matched?.params ?? {};
     const query = Object.fromEntries(url.searchParams);
-    const user = this.#store.get('user');
+    const user = store.get('user');
     const redirectMode = mode === 'none' ? 'replace' : mode;
 
     // Redirects and guards run before anything touches history or the DOM.
-    if (route.redirect) return this.#go(route.redirect, redirectMode);
+    if (route.redirect) return go(route.redirect, redirectMode);
 
     if (route.access === 'private' && !user) {
       const target = url.pathname + url.search;
-      return this.#go(`${this.#loginPath}?redirect=${encodeURIComponent(target)}`, redirectMode);
+      return go(`${loginPath}?redirect=${encodeURIComponent(target)}`, redirectMode);
     }
     if (route.access === 'guest' && user) {
-      return this.#go(safeRedirectPath(query.redirect, this.#homePath), redirectMode);
+      return go(safeRedirectPath(query.redirect, homePath), redirectMode);
     }
 
     if (mode !== 'none') {
@@ -131,43 +86,43 @@ export class Router {
       const same = href === location.pathname + location.search + location.hash;
       history[mode === 'push' && !same ? 'pushState' : 'replaceState']({}, '', href);
     }
-    this.#currentPath = url.pathname;
+    currentPath = url.pathname;
 
-    let PageClass;
+    let PageFactory;
     try {
-      PageClass = await route.loader();
+      PageFactory = await route.loader();
     } catch (error) {
-      if (id === this.#navId) this.#renderFatal(error);
+      if (id === navId) renderFatal(error);
       return;
     }
-    if (id !== this.#navId) return; // a newer navigation took over
+    if (id !== navId) return; // a newer navigation took over
 
-    this.#page?.destroy();
-    this.#page = null;
+    page?.destroy();
+    page = null;
 
-    const LayoutClass = route.layout;
-    if (LayoutClass !== this.#LayoutClass) {
-      this.#layout?.destroy();
-      this.#layout = new LayoutClass({ router: this, store: this.#store });
-      this.#layout.mount(this.#outlet);
-      this.#LayoutClass = LayoutClass;
+    const LayoutFactory = route.layout;
+    if (LayoutFactory !== currentLayoutFactory) {
+      layout?.destroy();
+      layout = LayoutFactory({ router, store });
+      layout.mount(outlet);
+      currentLayoutFactory = LayoutFactory;
     }
 
-    const page = new PageClass({ params, query, router: this, store: this.#store });
+    const nextPage = PageFactory({ params, query, router, store });
     try {
-      page.mount(this.#layout.outlet);
-      this.#page = page;
+      nextPage.mount(layout.getOutlet());
+      page = nextPage;
     } catch (error) {
-      page.destroy();
-      this.#renderFatal(error);
+      nextPage.destroy();
+      renderFatal(error);
       return;
     }
 
-    this.#afterRender(page.title);
-    this.#listeners.forEach((fn) => fn({ path: this.#currentPath, params, query }));
+    afterRender(nextPage.title);
+    listeners.forEach((fn) => fn({ path: currentPath, params, query }));
   }
 
-  #afterRender(title) {
+  function afterRender(title) {
     document.title = title ? `${title} · ${ENV.APP_NAME}` : ENV.APP_NAME;
 
     const announcer = document.getElementById('route-announcer');
@@ -175,13 +130,13 @@ export class Router {
 
     window.scrollTo(0, 0);
     // Move focus to the new content (not on the very first load).
-    if (!this.#firstRender) this.#layout.outlet?.focus({ preventScroll: true });
-    this.#firstRender = false;
+    if (!firstRender) layout.getOutlet()?.focus({ preventScroll: true });
+    firstRender = false;
   }
 
-  #renderFatal(error) {
+  function renderFatal(error) {
     console.error(error);
-    const container = this.#layout?.outlet ?? this.#outlet;
+    const container = layout?.getOutlet() ?? outlet;
 
     const box = document.createElement('div');
     box.className = 'fatal';
@@ -200,6 +155,40 @@ export class Router {
     box.append(title, text, button);
     container.replaceChildren(box);
   }
+
+  function navigate(to, { replace = false } = {}) {
+    return go(to, replace ? 'replace' : 'push');
+  }
+
+  const router = {
+    get currentPath() {
+      return currentPath;
+    },
+
+    start() {
+      history.scrollRestoration = 'manual';
+      document.addEventListener('click', onLinkClick, { signal: abort.signal });
+      window.addEventListener('popstate', () => render(new URL(location.href), 'none'), { signal: abort.signal });
+      return render(new URL(location.href), 'none');
+    },
+
+    navigate,
+
+    /** @returns {() => void} unsubscribe function. Called after each page is mounted. */
+    onNavigate(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+
+    destroy() {
+      abort.abort();
+      page?.destroy();
+      layout?.destroy();
+      listeners.clear();
+    },
+  };
+
+  return router;
 }
 
 /** '/historico/:id' -> { regex, keys: ['id'] } */

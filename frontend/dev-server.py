@@ -1,4 +1,4 @@
-# "Static dev server with SPA fallback: unknown paths without a file extension serve index.html."
+"""Static dev server with SPA fallback: unknown paths without a file extension serve index.html."""
 import http.server
 import os
 import socketserver
